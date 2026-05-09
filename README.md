@@ -1,45 +1,44 @@
 # User Service
 
-FastAPI service for user accounts, JWT authentication, XP/level tracking, leaderboards,
-and internal `answer-created` events from the survey workflow.
+## 1. Название и назначение сервиса
 
-## Port
+`user-service` — микросервис пользователей в системе PIUS. Он отвечает за регистрацию, аутентификацию, выдачу JWT, хранение профилей, начисление XP и таблицу лидеров.
 
-- HTTP: `8080`
+Основные функции:
 
-## Environment
+- регистрация пользователя;
+- вход в систему и выдача JWT;
+- получение профиля пользователя;
+- начисление XP по внутренним событиям;
+- расчет уровня пользователя;
+- таблица лидеров;
+- защита внутренних событий от повторной обработки.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `APP_NAME` | `User Service` | FastAPI application name |
-| `DATABASE_URL` | `sqlite:///./data/user-service.db` | SQLite database URL or path |
-| `JWT_SECRET` | `change-me-in-production` | Secret used to sign JWT access tokens |
-| `JWT_EXPIRATION_MINUTES` | `60` | Access token TTL |
-| `INTERNAL_API_KEY` | `change-me-in-production` | Token for internal service calls |
+## 2. Архитектура и зависимости
 
-## HTTP API
+Технологии:
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Healthcheck |
-| `POST` | `/register` | Register a user |
-| `POST` | `/login` | Issue a JWT |
-| `GET` | `/users/{user_id}` | Read user profile using JWT auth |
-| `GET` | `/users/{user_id}/stats` | Read XP and level |
-| `GET` | `/leaderboard` | Read leaderboard |
-| `POST` | `/internal/events/answer-created` | Award XP from an internal answer event |
+- Python 3.11;
+- FastAPI и Uvicorn;
+- Pydantic;
+- SQLite;
+- Alembic;
+- SQLAlchemy URL parser;
+- unittest и FastAPI TestClient;
+- JWT HS256 и PBKDF2-SHA256 для паролей.
 
-Internal endpoints require `X-Internal-Token: <INTERNAL_API_KEY>`.
+Взаимодействие с микросервисами:
 
-## Local Run
+- принимает от `survey-service` событие `POST /internal/events/answer-created`;
+- начисляет пользователю XP за сохраненный ответ;
+- внутренний эндпоинт защищен `INTERNAL_API_KEY`;
+- повторные события обрабатываются идемпотентно через `Idempotency-Key` и бизнес-ключ ответа.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python -m uvicorn app.main:app --app-dir src --host 0.0.0.0 --port 8080
-```
+Внешние сервисы не используются. Redis, Kafka, S3 и внешняя PostgreSQL в текущей версии не требуются.
 
-## Docker
+## 3. Способы запуска сервиса
+
+### Через Docker
 
 ```powershell
 docker build -t user-service .
@@ -50,10 +49,60 @@ docker run --rm -p 8080:8080 `
   user-service
 ```
 
-## Tests
+### Без Docker
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python -m uvicorn app.main:app --app-dir src --host 0.0.0.0 --port 8080
+```
+
+### Переменные окружения
+
+| Переменная | По умолчанию | Назначение |
+| --- | --- | --- |
+| `APP_NAME` | `User Service` | имя FastAPI-приложения |
+| `DATABASE_URL` | `sqlite:///./data/user-service.db` | SQLite база данных |
+| `JWT_SECRET` | `change-me-in-production` | секрет для JWT |
+| `JWT_EXPIRATION_MINUTES` | `60` | время жизни JWT |
+| `INTERNAL_API_KEY` | `change-me-in-production` | ключ внутренних API-вызовов |
+
+Для запуска всей системы используется общий репозиторий `bozvan/PIUS` и команда `docker compose up --build -d`.
+
+## 4. API документация
+
+После запуска Swagger доступен по адресу:
+
+- `http://localhost:8080/docs`
+- `http://localhost:8080/openapi.json`
+
+Основные эндпоинты:
+
+| Метод | Путь | Описание |
+| --- | --- | --- |
+| `GET` | `/health` | проверка работоспособности |
+| `POST` | `/register` | регистрация пользователя |
+| `POST` | `/login` | получение JWT |
+| `GET` | `/users/{user_id}` | профиль пользователя по JWT |
+| `GET` | `/users/{user_id}/stats` | XP и уровень |
+| `GET` | `/leaderboard` | таблица лидеров |
+| `POST` | `/internal/events/answer-created` | начисление XP по внутреннему событию |
+
+Внутренний эндпоинт требует заголовок `X-Internal-Token: <INTERNAL_API_KEY>`.
+
+## 5. Как тестировать
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python -m unittest discover -s tests -v
 ```
+
+## 6. Контакты и поддержка
+
+Автор сервиса: Андреев И.
+
+Поддержка:
+
+- GitHub Issues: https://github.com/Iv05An/user-service/issues
+- GitHub: https://github.com/Iv05An
